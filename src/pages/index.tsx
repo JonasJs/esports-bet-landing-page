@@ -1,5 +1,6 @@
-
+import { FormEvent, useState } from "react";
 import Image from "next/image";
+import { api } from "../lib/axios";
 
 // Images
 import PreviewMobileImg from '../assets/iPhone-Mockup.png';
@@ -9,13 +10,39 @@ import IconChackeImg from "../assets/check-icon.svg";
 
 
 interface IHomeProps {
-  pools: {
-    count: number
-  };
+  poolCount: number
+  guessCount: number
+  userCount: number
 }
 
 export default function Home(props: IHomeProps) {
 
+  const [poolTitle, setPoolTitle] = useState('');
+  
+  async function handleCreatePool(event: FormEvent) {
+    try {
+      
+      event.preventDefault();
+      if(poolTitle.trim() === '') {
+        return;
+      }
+
+      const response = await api.post('/pools', {
+        title: poolTitle,
+      });
+
+      const { code, title } = response.data;
+
+      await navigator.clipboard.writeText(code);
+      // TODO: Show success message
+      alert("Bolão criado com sucesso. ")
+
+    } catch (error) {
+      setPoolTitle('');
+      alert(error.message)
+      // TODO: Show error message .. Falha ao criar o bolão, tente novamente!;
+    }
+  }
 
   return (
     <div className="
@@ -27,6 +54,7 @@ export default function Home(props: IHomeProps) {
           src={LogoImg}
           alt="eSports Bet"
           title="eSports Bet"
+          className="w-56"
         />
 
         <h1 className="mt-14 text-white text-5xl font-bold leading-tight">
@@ -37,11 +65,13 @@ export default function Home(props: IHomeProps) {
         <div className="mt-10 flex items-center gap-2">
           <Image src={UsersAvatarExampleImg} alt="Imagens de usuarios"/>
           <strong className="text-gray-100 text-xl">
-            <span className="text-yellow-500">+12.592</span> pessoas já estão usando
+            <span className="text-yellow-500">+{props.userCount}</span> pessoas já estão usando
           </strong>
         </div>
 
-        <form className="mt-10 flex gap-2">
+        <form
+          onSubmit={handleCreatePool}
+          className="mt-10 flex gap-2">
           <input
             className="
               flex-1
@@ -51,7 +81,9 @@ export default function Home(props: IHomeProps) {
               text-sm text-gray-800
               outline-offset-1 outline-purple-200"
             type="text"
+            value={poolTitle}
             placeholder="Qual nome do seu bolão"
+            onChange={event => setPoolTitle(event.target.value)}
           />
           <button
             className="
@@ -77,7 +109,7 @@ export default function Home(props: IHomeProps) {
           <div className="flex items-center gap-6">
             <Image src={IconChackeImg} alt="Icone de check"/>
             <div className="flex flex-col">
-              <span className="font-bold text-2xl">+2.034</span>
+              <span className="font-bold text-2xl">+{props.poolCount}</span>
               <span>Bolões criados</span>
             </div>
           </div>
@@ -85,7 +117,7 @@ export default function Home(props: IHomeProps) {
           <div className="flex items-center gap-6">
             <Image src={IconChackeImg} alt="Icone de check"/>
             <div className="flex flex-col">
-              <span className="font-bold text-2xl">+2.034</span>
+              <span className="font-bold text-2xl">+{props.guessCount}</span>
               <span>Palpites enviados</span>
             </div>
           </div>
@@ -102,15 +134,20 @@ export default function Home(props: IHomeProps) {
   )
 }
 
-export const getServerSideProps = async () => {
-  const response = await fetch(process.env.NEXT_PUBLIC_API_URL + '/pools/count')
-  const data = await response.json();
+export const getStaticProps = async () => {
+
+  const [poolCountResponse, guessCountResponse, userCountResponse ] = await Promise.all([
+    api.get('/pools/count'),
+    api.get('/guesses/count'),
+    api.get('/users/count') 
+  ]);
 
   return {
     props: {
-      pools: {
-        count: data?.count || 0,
-      }
-    }
+      poolCount: poolCountResponse?.data?.count || 0,
+      guessCount: guessCountResponse?.data?.count || 0,
+      userCount: userCountResponse?.data?.count || 0,
+    },
+    revalidate: 60 * 60 * 1, // 1 hour
   }
 }
